@@ -1,0 +1,141 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h> 
+#include <wait.h>
+#include <pthread.h>
+
+pid_t my_fork (void)
+{
+	pid_t fork_id=fork();
+	if(fork_id<0) //fork faild
+	{
+		printf("Error");
+		exit;
+	}
+	else
+	{	if(fork_id>0)
+			return fork_id;		
+	}
+}
+void print_pids (int fd, short unsigned int N, short unsigned int G)
+{
+	int i;
+	int gen=0,children=0;
+	pid_t pid;
+	int status;
+	char* str;
+	while(children<N&&gen<G)
+	{	
+		pid=my_fork();
+		if(pid>0)
+		{
+			children++;
+			waitpid(pid,&status,0);
+			if(children==N)
+			{	
+				sprintf(str,"My pid is %d. My generation is %d.\n",getpid(),gen);
+				write (fd, str, strlen(str));	
+			}
+		}
+		else
+		{
+			gen++;
+			if(gen==G)
+			{
+				sprintf(str,"My pid is %d. My generation is %d.\n",getpid(),gen);
+				write (fd, str, strlen(str));
+				
+			}
+					
+			children=0;
+		}
+	}
+	pid=getpid();
+	if(gen!=0)
+	{
+		kill(pid,SIGINT);
+	}
+}
+void count_lines (short unsigned int G)
+{
+	char buffer[256];
+	int gen=0;int counter=0,status;
+	pid_t pid;
+	char str[200];
+	FILE *grep;
+	while(gen<=G)
+	{
+		pid=my_fork();
+		
+		if(pid>0)
+		{
+			
+			waitpid(pid,&status,0);
+			sprintf(str,"grep -c \'My generation is %d\' out.txt",gen);
+			grep=popen(str,"r");
+			while(fgets(buffer,sizeof(buffer),grep)!=0)
+			{
+				printf("Number of lines by processes of generation %d is %s",gen,buffer);
+				
+	
+			}
+			pclose(grep);
+			break;
+		}
+			
+		else{gen++;}
+	}
+	pid=getpid();
+	if(gen!=0)
+	{
+		kill(pid,SIGINT);
+	}
+}
+void *printme(void *id) 
+{
+	int *i;
+	i=(int*)id;
+    	printf("Hi. I'm thread number %d\n",*i);
+    	return NULL;
+}
+void print_threads(short unsigned int N)
+{
+	pthread_t tcb;
+	void *status;
+	int i, vals[N];
+	pthread_t tids[N]; //Will hold the tids of the created threads
+	for (i = 0; i < N; i++) {
+		vals[i] = i;
+		pthread_create (&(tids[i]), NULL, printme, vals+i);
+		if (pthread_join(tids[i], &status) != 0) { 
+		perror("pthread_join failed");
+		exit(1);
+		}
+	}
+	
+	
+
+}
+int main (int argc, char* argv[])
+{
+	//pid_t_my_fork();
+	//pid_t main_pid=getpid();
+	const char* filename = "out.txt";
+
+	int fd;	
+	fd = open (filename, O_RDWR | O_CREAT | O_TRUNC, 0666);
+	if (fd < 0) {
+		perror ("Error openning file\n");
+		exit (1);
+	}
+	int N;int G;
+	sscanf (argv[1],"%d", &N);
+	sscanf (argv[2],"%d", &G);
+	print_pids(fd,N,G);
+	count_lines(G);
+	print_threads(N);
+	close(fd);
+	exit(0);
+}
