@@ -1,0 +1,404 @@
+#include<stdio.h>
+#include<unistd.h>
+#include<sys/types.h>
+#include<pthread.h>
+#include<time.h>
+#include<stdlib.h>
+#include<fcntl.h>
+#include<wait.h>
+//#include<random.h>
+
+#define N 5
+#define FIN_PROB 0.5
+#define MIN_INTER_ARRIVAL_IN_NS 8000000 // minimum arrival time ns
+#define MAX_INTER_ARRIVAL_IN_NS 9000000 // maximum arrival time ns
+#define INTER_MOVES_IN_NS 	 100000  // time between moves ns
+#define SIM_TIME 2 //time of simulation = 2 sec
+#define PROB_RESULOTION 100 //we didnt know what to expact with how small the test of probability will be so we defined the resulotion parameter to change the probability resolution  
+//you can change it as you like -> tester//
+char board_mat[N][N];
+pthread_mutex_t lock_mat[N][N];
+void Print_Board()
+{	
+	int i,j;
+	for(i=0;i<N;i++)
+	{
+		for(j=0;j<N;j++)
+		{
+			printf("%c",board_mat[i][j]);
+		
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+void *turn(void* num_gen)
+{
+	struct timespec tim, tim2;
+	   	tim.tv_sec = 0;
+		tim.tv_nsec=INTER_MOVES_IN_NS;
+	int i=0,j=0;
+	int dirc;
+	int* num=(int*)num_gen;
+	
+	//in it the the car creation index
+	switch(*num)
+		{
+			case 1:
+				i=0;j=N-1;
+				break;
+			case 2:
+				i=0;j=0;
+				break;
+			case 3:
+				i=N-1;j=0;
+				break;
+			case 4:
+				i=N-1,j=N-1;
+				break;
+		}
+
+	while(1)
+	{	
+		//printf("\n____FROM (%d,%d)____\n",i,j);
+		//Print_Board();
+		
+		
+		nanosleep(&tim,&tim2);
+		
+		if((j==0)&&(i>0&&i<N-1))
+		{
+
+				if(pthread_mutex_lock(&(lock_mat[i+1][j]))==0) //lock the slot until the car is generated if possible
+					{	
+						if(board_mat[i+1][j] !='*')
+						{
+							board_mat[i][j] =' ';	
+							board_mat[i+1][j] ='*';	
+							i++;		
+						}
+					}
+				else{printf("\nmutex ERROR\n");exit(1);}
+					
+				if(pthread_mutex_unlock(&(lock_mat[i+1][j]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+		}
+		else if((j==N-1)&&(i>0&&i<N-1))
+		{
+				
+				if(pthread_mutex_lock(&(lock_mat[i-1][j]))==0) //lock the slot until the car is generated if possible
+					{
+						if(board_mat[i-1][j] !='*')
+						{
+							board_mat[i][j] =' ';	
+							board_mat[i-1][j] ='*';
+							i--;			
+						}
+					}
+				else{printf("\nmutex ERROR\n");exit(1);}
+				if(pthread_mutex_unlock(&(lock_mat[i-1][j]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+		}
+		else if((i==0)&&(j>0&&j<N-1))
+		{
+
+				if(pthread_mutex_lock(&(lock_mat[i][j-1]))==0) //lock the slot until the car is generated if possible
+					{
+						if(board_mat[i][j-1] !='*')
+						{
+							board_mat[i][j] =' ';	
+							board_mat[i][j-1] ='*';
+							j--;			
+						}
+					}
+				else{printf("\nmutex ERROR\n");exit(1);}
+				if(pthread_mutex_unlock(&(lock_mat[i][j-1]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+		}
+		else if((i==N-1)&&(j>0&&j<N-1))
+		{
+				
+				if(pthread_mutex_lock(&(lock_mat[i][j+1]))==0) //lock the slot until the car is generated if possible
+					{
+						if(board_mat[i][j+1] !='*')
+						{
+							board_mat[i][j] =' ';	
+							board_mat[i][j+1] ='*';	
+							j++;		
+						}
+					}
+				else{printf("\nmutex ERROR\n");exit(1);}
+				if(pthread_mutex_unlock(&(lock_mat[i][j+1]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+		}
+		else
+		{
+			if((rand()%PROB_RESULOTION)<(PROB_RESULOTION*FIN_PROB))
+			{
+				if(pthread_mutex_lock(&(lock_mat[i][j]))==0) //lock the slot until the car is generated if possible
+				{	board_mat[i][j] =' ';}
+					
+				else{printf("\nmutex ERROR\n");exit(1);}			
+				if(pthread_mutex_unlock(&(lock_mat[i][j]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+				pthread_exit(NULL);
+					
+			}
+			else
+			{
+
+					if(i==0&&j==0)
+					{
+
+						if(pthread_mutex_lock(&(lock_mat[i+1][j]))==0) //lock the slot until the car is generated if possible
+						{	if(board_mat[i+1][j] !='*')
+							{
+								board_mat[i][j] =' ';	
+								board_mat[i+1][j] ='*';
+								i++;			
+							}
+						}
+						else{printf("\nmutex ERROR\n");exit(1);}
+						if(pthread_mutex_unlock(&(lock_mat[i+1][j]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability
+					
+					}
+					else if(i==0&&j==N-1)
+					{
+						
+						if(pthread_mutex_lock(&(lock_mat[i][j-1]))==0) //lock the slot until the car is generated if possible
+						{
+							if(board_mat[i][j-1] !='*')
+							{
+								
+								board_mat[i][j] =' ';	
+								board_mat[i][j-1] ='*';
+								j--;			
+							}
+						}
+						else{printf("\nmutex ERROR\n");exit(1);}
+						if(pthread_mutex_unlock(&(lock_mat[i][j-1]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+					
+					}
+					else if(i==N-1&&j==0)
+					{
+						if(pthread_mutex_lock(&(lock_mat[i][j+1]))==0) //lock the slot until the car is generated if possible
+						{
+							if(board_mat[i][j+1] !='*')
+							{
+								board_mat[i][j] =' ';	
+								board_mat[i][j+1] ='*';
+								j++;			
+							}
+						}
+						else{printf("\nmutex ERROR\n");exit(1);}
+						if(pthread_mutex_unlock(&(lock_mat[i][j+1]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability	
+						
+					}
+					else if(i==N-1&&j==N-1)
+					{
+						if(pthread_mutex_lock(&(lock_mat[i-1][j]))==0) //lock the slot until the car is generated if possible
+						{
+							if(board_mat[i-1][j] !='*')
+							{
+								board_mat[i][j] =' ';	
+								board_mat[i-1][j] ='*';
+								i--;			
+							}
+						}
+						else{printf("\nmutex ERROR\n");exit(1);}
+						if(pthread_mutex_unlock(&(lock_mat[i-1][j]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability
+						
+					}
+			}
+		}
+		//Print_Board();
+		//printf("\n____TO (%d,%d)____\n",i,j);
+		
+	}
+	
+}
+
+
+void *gen_action(void* num_gen)
+{
+	
+	int i1=1,i2=2,i3=3,i4=4;
+	int* num=(int*)num_gen;
+	pthread_t car;
+	while(1)
+	{
+		
+		switch(*num)
+		{
+			case 1:
+				if(pthread_mutex_lock(&(lock_mat[0][N-1]))==0) //lock the slot until the car is generated if possible
+				{
+					if(board_mat[0][N-1] !='*')
+					{
+						board_mat[0][N-1] ='*';	
+								
+					}
+				}
+				else{printf("\nmutex ERROR\n");exit(1);}	
+				if(pthread_mutex_unlock(&(lock_mat[0][N-1]))!=0){printf("\nmutex ERROR\n");exit(1);} //open the slot after checking availability
+				if(pthread_create(&car, NULL,turn,&i1)!=0)//creates new threads of new car,to play each turn until the time runs out
+				{
+					printf("ERROR creating thread\n");
+					exit(1);
+				}
+
+				break;
+				
+			case 2:
+				if(pthread_mutex_lock(&(lock_mat[0][0]))==0)//lock the slot until the car is generated if possible
+				{
+					if(board_mat[0][0] !='*')
+					{
+						board_mat[0][0] ='*';			
+					}
+				}
+				else{printf("\nmutex ERROR\n");exit(1);}
+				if(pthread_mutex_unlock(&(lock_mat[0][0]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability
+				if(pthread_create(&car, NULL,turn,&i2)!=0)//creates new threads of new car,to play each turn until the time runs out
+				{
+					printf("ERROR creating thread\n");
+					exit(1);
+				}
+
+				break;
+				
+			case 3:
+				if(pthread_mutex_lock(&(lock_mat[N-1][0]))==0)//lock the slot until the car is generated if possible
+				{	if(board_mat[N-1][0] !='*')
+					{
+						board_mat[N-1][0] ='*';			
+					}
+				}
+				else{printf("\nmutex ERROR\n");exit(1);}
+				if(pthread_mutex_unlock(&(lock_mat[N-1][0]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability
+				if(pthread_create(&car, NULL,turn,&i3)!=0)//creates new threads of new car,to play each turn until the time runs out
+				{
+					printf("ERROR creating thread\n");
+					exit(1);
+				}
+
+				break;
+				
+			case 4:
+				if(pthread_mutex_lock(&(lock_mat[N-1][N-1]))==0)//lock the slot until the car is generated if possible
+				{
+					if(board_mat[N-1][N-1] !='*')
+					{
+						board_mat[N-1][N-1] ='*';			
+					}
+				}
+				else{printf("\nmutex ERROR\n");exit(1);}
+				if(pthread_mutex_unlock(&(lock_mat[N-1][N-1]))!=0){printf("\nmutex ERROR\n");exit(1);}//open the slot after checking availability
+				if(pthread_create(&car, NULL,turn,&i4)!=0)//creates new threads of new car,to play each turn until the time runs out
+				{
+					printf("ERROR creating thread\n");
+					exit(1);
+				}
+
+				break;
+				
+		
+		}
+		
+	int wait_time=(rand()%(MAX_INTER_ARRIVAL_IN_NS-MIN_INTER_ARRIVAL_IN_NS+1))+MIN_INTER_ARRIVAL_IN_NS; //random time to wait between car generation
+	struct timespec tim, tim2;
+   	tim.tv_sec = 0;
+	tim.tv_nsec=wait_time;
+	nanosleep(&tim,&tim2);
+	}
+}
+
+
+void Init_Board() //start board cells as spaces
+{	
+	int i,j;
+	for(i=0;i<N;i++)
+	{
+		for(j=0;j<N;j++)
+		{
+			board_mat[i][j]=' ';
+		
+		}
+	}
+}
+int main (void) 
+{
+
+	int counter=0;
+	Init_Board();
+	int i,j;
+	for(i=1;i<N-1;i++)
+	{
+		for(j=1;j<N-1;j++)
+		{
+			board_mat[i][j]='@';
+		
+		}
+	}
+//---------------------------------------------------------------------------------------------------------------
+	/*   initiate muteces   */
+	
+	for(i=0;i<N;i++)
+	{
+		for(j=0;j<N;j++)
+		{
+			//pthread_mutexattr_init(&att);
+			//pthread_mutexattr_settype(&att,PTHREAD_MUTEX_ERRORCHECK);
+			pthread_mutex_init(&(lock_mat[i][j]),NULL);
+		
+		}
+	}
+//---------------------------------------------------------------------------------------------------------------
+	pthread_t gen1,gen2,gen3,gen4;
+	int i1=1,i2=2,i3=3,i4=4;
+	if(pthread_create(&gen1, NULL,gen_action,&i1)!=0) //gen1 thread (top right)
+	{
+		printf("ERROR creating thread\n");
+		exit(1);
+	}
+	if(pthread_create(&gen2, NULL,gen_action,&i2)!=0)//gen2 thread (top left)
+	{
+		printf("ERROR creating thread\n");
+		exit(1);
+	}
+	if(pthread_create(&gen3, NULL,gen_action,&i3)!=0)//gen3 thread (bottom left)
+	{
+		printf("ERROR creating thread\n");
+		exit(1);
+	}
+	if(pthread_create(&gen4, NULL,gen_action,&i4)!=0)//gen4 thread (bottom right)
+	{
+		printf("ERROR creating thread\n");
+		exit(1);
+	}
+	int k;
+	char l=' ';
+	while(counter!=10)
+	{	
+		//usleep(SIM_TIME*10000);//=0.2 sec=200 msec //as we find out there is a ERROR when we run it with sleep  (tpp.c:85 -prioritatio error -1) we couldnt find any solution online or any logical problem with the code so we will have to deliver it as it is. we would appreciate an honest feedback and a soulution if possible regardlles to the grade. :(
+		for(k=0;k<10000;k++){k++;k--;}
+		Print_Board();
+		counter++;
+		
+	
+		
+	}
+	pthread_cancel(gen1);
+	pthread_cancel(gen2);
+	pthread_cancel(gen3);
+	pthread_cancel(gen4);
+//---------------------------------------------------------------------------------------------------------------
+	/*   destroy muteces   */
+	for(i=0;i<N;i++)
+	{
+		for(j=0;j<N;j++)
+		{
+			pthread_mutex_destroy(&(lock_mat[i][j]));
+		
+		}
+	}
+//-----------------------------------------------------------------------------------------------------------------
+	exit(0);
+}
+		
+				
